@@ -14,10 +14,10 @@ End-to-end analytics engineering project that:
 
 This repository is an end-to-end analytics engineering project that simulates a food delivery platform and builds a production-style analytics warehouse locally.
 
-**Goal**
-- Start from an OLTP-style source database (PostgreSQL) and produce clean, well-tested analytics tables (DuckDB + dbt) that support reporting and analysis such as order performance, delivery timelines, menu item trends, restaurant changes over time, and refunds.
+### Goal
+Start from an OLTP-style source database (PostgreSQL) and produce clean, well-tested analytics tables (DuckDB + dbt) that support reporting and analysis such as order performance, delivery timelines, menu item trends, restaurant changes over time, and refunds.
 
-**What it builds**
+### What it builds
 - A full pipeline: **Postgres (OLTP) → Parquet (bronze) → DuckDB raw views → dbt staging → dbt intermediate → dbt gold star schema**
 - **Staging models** standardize data types, clean strings, and parse timestamps.
 - **Intermediate models** compute order rollups, status timelines (placed/accepted/picked up/delivered), delivery enrichment, and reconciliation checks.
@@ -26,10 +26,9 @@ This repository is an end-to-end analytics engineering project that simulates a 
   - Facts (orders, order_items, refunds, fx_rates)
 - **SCD2 snapshots** track changes to restaurants and menu items over time and join the correct historical version into facts.
 
-**Why this matters (analytics engineering focus)**
+### Why this matters (analytics engineering focus)
 - Demonstrates typical warehouse practices: layered modeling, SCD handling, referential integrity tests, business-rule tests, and reproducible local setup.
 - The end result is a set of query-ready fact/dimension tables suitable for BI dashboards or ad-hoc analytics.
-
 
 ---
 
@@ -51,39 +50,63 @@ This repository is an end-to-end analytics engineering project that simulates a 
 brew install postgresql duckdb
 brew services start postgresql
 ```
+## Setup
 
-0) Python environment + dependencies (requirements.txt)
+### 0) Python environment + dependencies (requirements.txt)
+
 From repo root:
 
+```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
 
+### 1) Create PostgreSQL database + OLTP schema
 
-1) Create PostgreSQL database + OLTP schema
 From repo root:
+
 Create database:
+
+```bash
 createdb food_delivery
+```
 
 Apply schema files:
+
+```bash
 psql -d food_delivery -f oltp/schema.sql
 psql -d food_delivery -f oltp/new_update_schema.sql
+```
 
 (Optional) Verify tables:
-psql -d food_delivery -c "\dt oltp.*"
 
-2) Populate OLTP (optional sample data)
+```bash
+psql -d food_delivery -c "\dt oltp.*"
+```
+
+### 2) Populate OLTP (optional sample data)
+
+```bash
 source venv/bin/activate
 python oltp/populate_oltp.py
+```
 
-3) Export Postgres → Parquet (bronze layer)
+### 3) Export Postgres → Parquet (bronze layer)
 
-food_delivery_dbt/data/bronze/
+Output directory:
 
+`food_delivery_dbt/data/bronze/`
+
+Run:
+
+```bash
 python postgres_to_duckdb.py
+```
 
-Expected Outputs:
+Expected outputs:
 
+```text
 food_delivery_dbt/data/bronze/
 ├─ customers.parquet
 ├─ customer_addresses.parquet
@@ -99,31 +122,39 @@ food_delivery_dbt/data/bronze/
 ├─ order_status_events/...
 ├─ refunds/...
 └─ fx_rates/...
+```
 
-4) Create DuckDB raw views over Parquet
+### 4) Create DuckDB raw views over Parquet
 
+```bash
 duckdb food_delivery_dbt/warehouse/food_delivery.duckdb < food_delivery_dbt/warehouse/sql/create_raw_views.sql
+```
 
 Verify:
 
+```bash
 duckdb food_delivery_dbt/warehouse/food_delivery.duckdb -c "show schemas;"
 duckdb food_delivery_dbt/warehouse/food_delivery.duckdb -c "show tables in raw;"
 duckdb food_delivery_dbt/warehouse/food_delivery.duckdb -c "select count(*) from raw.orders;"
+```
 
-5) dbt setup
+### 5) dbt setup
 
+```bash
 cd food_delivery_dbt
-
 dbt init
 dbt deps
+```
 
-6) Configure dbt profile (~/.dbt/profiles.yml)
+### 6) Configure dbt profile (~/.dbt/profiles.yml)
 
-create/edit:
+Create/edit:
 
-~/.dbt/profiles.yml
+`~/.dbt/profiles.yml`
 
 Recommended portable version (uses env var for the DuckDB file path):
+
+```yaml
 food_delivery_dbt:
   target: dev
   outputs:
@@ -131,156 +162,136 @@ food_delivery_dbt:
       type: duckdb
       path: "{{ env_var('DUCKDB_PATH') }}"
       threads: 4
+```
 
 Set the env var from inside the dbt project directory:
-export DUCKDB_PATH="$(pwd)/warehouse/food_delivery.duckdb"
 
+```bash
+export DUCKDB_PATH="$(pwd)/warehouse/food_delivery.duckdb"
+```
 
 Confirm dbt can connect:
+
+```bash
 dbt debug
+```
 
-
-7) Run snapshots + build models
+### 7) Run snapshots + build models
 
 This project snapshots:
 
-snap_restaurants (restaurant attributes SCD2)
-snap_menu_items (menu items attributes SCD2)
+- `snap_restaurants` (restaurant attributes SCD2)
+- `snap_menu_items` (menu items attributes SCD2)
 
 Run snapshots:
 
+```bash
 dbt snapshot
+```
 
 Build everything (models + tests):
+
+```bash
 dbt build
+```
+
 Other useful commands:
 
+```bash
 dbt run
 dbt test
-Data model overview
-Bronze (files)
-Parquet files in food_delivery_dbt/data/bronze/
+```
 
+---
 
-Raw (DuckDB views)
-raw.* views created by warehouse/sql/create_raw_views.sql
+## Data model overview
 
+### Bronze (files)
+Parquet files in `food_delivery_dbt/data/bronze/`
 
-Purpose: expose Parquet as queryable sources for dbt
+### Raw (DuckDB views)
+`raw.*` views created by `warehouse/sql/create_raw_views.sql`
 
+Purpose: expose Parquet as queryable sources for dbt.
 
-Staging models (stg_raw__*)
-Type casting (IDs, decimals, timestamps)
+### Staging models (`stg_raw__*`)
+- Type casting (IDs, decimals, timestamps)
+- String cleanup (`trim`, `nullif`, `upper`)
+- Parsed timestamps into `timestamptz`
+- Derived date fields (`*_date_utc`)
 
+### Intermediate models
 
-String cleanup (trim, nullif, upper)
+**Orders**
+- `int_orders__items_rollup`: item totals and counts at order grain
+- `int_orders__status_rollup`: per-status timestamps + SLA metrics
+- `int_orders__delivery_enriched`: delivery assignment enrichment
+- `int_orders__reconciliation`: expected totals and differences
+- `int_orders__enriched`: unified order-grain dataset
 
+**Items**
+- `int_order_items__enriched`: item grain enriched with order + menu item context
 
-Parsed timestamps into timestamptz
+**Refunds**
+- `int_refunds__enriched`: refund grain enriched with order context + checks
 
+### Gold star schema
 
-Derived date fields (*_date_utc)
+**Dimensions**
+- `dim_customers`
+- `dim_customer_addresses`
+- `dim_couriers`
+- `dim_currencies`
+- `dim_date`
+- `dim_restaurants` (SCD2 snapshot)
+- `dim_menu_items` (SCD2 snapshot)
 
+**Facts**
+- `fct_orders` (order grain, joins restaurant SCD2 at order time)
+- `fct_order_items` (order-item grain, joins menu-item SCD2 at order time)
+- `fct_refunds` (refund grain with order + rollups)
+- `fct_fx_rates` (fx rates enriched with currency codes)
 
-Intermediate models
-Orders:
-int_orders__items_rollup: item totals and counts at order grain
+---
 
+## Data quality checks
 
-int_orders__status_rollup: per-status timestamps + SLA metrics
+### Schema tests (YAML)
+- `not_null` / `unique` on keys
+- `relationships` between facts/dims
+- `accepted_values` for enum-like fields
+- SCD window sanity:
+  - `valid_to > valid_from`
+  - one current row per natural key
 
+### Custom SQL tests (`food_delivery_dbt/tests/`)
 
-int_orders__delivery_enriched: delivery assignment enrichment
-
-
-int_orders__reconciliation: expected totals and differences
-
-
-int_orders__enriched: unified order-grain dataset
-
-
-Items:
-int_order_items__enriched: item grain enriched with order + menu item context
-
-
-Refunds:
-int_refunds__enriched: refund grain enriched with order context + checks
-
-
-Gold star schema
-Dimensions:
-dim_customers
-
-
-dim_customer_addresses
-
-
-dim_couriers
-
-
-dim_currencies
-
-
-dim_date
-
-
-dim_restaurants (SCD2 snapshot)
-
-
-dim_menu_items (SCD2 snapshot)
-
-
-Facts:
-fct_orders (order grain, joins restaurant SCD2 at order time)
-
-
-fct_order_items (order-item grain, joins menu-item SCD2 at order time)
-
-
-fct_refunds (refund grain with order + rollups)
-
-
-fct_fx_rates (fx rates enriched with currency codes)
-
-
-Data quality checks
-Schema tests (YAML)
-not_null / unique on keys
-
-
-relationships between facts/dims
-
-
-accepted_values for enum-like fields
-
-
-SCD window sanity (valid_to > valid_from, one current row per natural key)
-
-
-Custom SQL tests (food_delivery_dbt/tests/)
 Examples:
-FX: no same-currency pair, unique pair+timestamp, positive/reasonable rates
-
-
-Orders: delivered implies delivered_at exists
-
-
-Orders: status timestamps are ordered correctly
-
-
-Orders: total consistency (subtotal + tax + fee - discount ≈ total)
-
-
-Refunds: refund timestamp after order placed
-
-
-Refunds: refund does not exceed order total (tolerance)
-
+- FX:
+  - no same-currency pair
+  - unique pair + timestamp
+  - positive/reasonable rates
+- Orders:
+  - delivered implies delivered_at exists
+  - status timestamps are ordered correctly
+  - total consistency (`subtotal + tax + fee - discount ≈ total`)
+- Refunds:
+  - refund timestamp after order placed
+  - refund does not exceed order total (tolerance)
 
 Run:
+
+```bash
 dbt test
-End-to-end quickstart
+```
+
+---
+
+## End-to-end quickstart
+
 From repo root:
+
+```bash
 brew install postgresql duckdb
 brew services start postgresql
 
@@ -303,325 +314,270 @@ dbt deps
 dbt debug
 dbt snapshot
 dbt build
-
-```mermaid
-flowchart TB
-
-%% =========================
-%% OLTP (Postgres)
-%% =========================
-subgraph OLTP["OLTP (PostgreSQL)"]
-  C["oltp.customers"]
-  CA["oltp.customer_addresses"]
-  RB["oltp.restaurant_brands"]
-  RO["oltp.restaurant_outlets"]
-  MI["oltp.menu_items"]
-  CO["oltp.couriers"]
-  O["oltp.orders"]
-  OI["oltp.order_items"]
-  OSE["oltp.order_status_events"]
-  DA["oltp.delivery_assignments"]
-  R["oltp.refunds"]
-  RT["oltp.ratings"]
-  CUR["oltp.currencies"]
-  FX["oltp.fx_rates"]
-end
-
-RB --> RO
-RO --> MI
-C --> CA
-C --> O
-CA --> O
-RO --> O
-O --> OI
-MI --> OI
-O --> OSE
-O --> DA
-CO --> DA
-O --> R
-O --> RT
-C --> RT
-CUR --> O
-CUR --> R
-CUR --> FX
-CUR --> FX
-
-%% =========================
-%% Bronze (Parquet)
-%% =========================
-subgraph BRONZE["Bronze (Parquet files)"]
-  B_C["bronze/customers.parquet"]
-  B_CA["bronze/customer_addresses.parquet"]
-  B_RB["bronze/restaurant_brands.parquet"]
-  B_RO["bronze/restaurant_outlets.parquet"]
-  B_MI["bronze/menu_items.parquet"]
-  B_CO["bronze/couriers.parquet"]
-  B_CUR["bronze/currencies.parquet"]
-  B_DA["bronze/delivery_assignments.parquet"]
-  B_RT["bronze/ratings.parquet"]
-  B_O["bronze/orders/**/*.parquet"]
-  B_OI["bronze/order_items/**/*.parquet"]
-  B_OSE["bronze/order_status_events/**/*.parquet"]
-  B_R["bronze/refunds/**/*.parquet"]
-  B_FX["bronze/fx_rates/**/*.parquet"]
-end
-
-%% (Your python export: Postgres -> DuckDB -> Parquet)
-C --> B_C
-CA --> B_CA
-RB --> B_RB
-RO --> B_RO
-MI --> B_MI
-CO --> B_CO
-CUR --> B_CUR
-DA --> B_DA
-RT --> B_RT
-O --> B_O
-OI --> B_OI
-OSE --> B_OSE
-R --> B_R
-FX --> B_FX
-
-%% =========================
-%% DuckDB Raw Views (sources)
-%% =========================
-subgraph RAW["DuckDB raw schema (views from Parquet)"]
-  S_C["source: raw.customers"]
-  S_CA["source: raw.customer_addresses"]
-  S_RB["source: raw.restaurant_brands"]
-  S_RO["source: raw.restaurant_outlets"]
-  S_MI["source: raw.menu_items"]
-  S_CO["source: raw.couriers"]
-  S_CUR["source: raw.currencies"]
-  S_DA["source: raw.delivery_assignments"]
-  S_RT["source: raw.ratings"]
-  S_O["source: raw.orders"]
-  S_OI["source: raw.order_items"]
-  S_OSE["source: raw.order_status_events"]
-  S_R["source: raw.refunds"]
-  S_FX["source: raw.fx_rates"]
-end
-
-B_C --> S_C
-B_CA --> S_CA
-B_RB --> S_RB
-B_RO --> S_RO
-B_MI --> S_MI
-B_CO --> S_CO
-B_CUR --> S_CUR
-B_DA --> S_DA
-B_RT --> S_RT
-B_O --> S_O
-B_OI --> S_OI
-B_OSE --> S_OSE
-B_R --> S_R
-B_FX --> S_FX
-
-%% =========================
-%% Staging
-%% =========================
-subgraph STG["dbt Staging (clean types + standardization)"]
-  STG_C["stg_raw__customers"]
-  STG_CA["stg_raw__customer_addresses"]
-  STG_RB["stg_raw__restaurant_brands"]
-  STG_RO["stg_raw__restaurant_outlets"]
-  STG_MI["stg_raw__menu_items"]
-  STG_CO["stg_raw__couriers"]
-  STG_CUR["stg_raw__currencies"]
-  STG_DA["stg_raw__delivery_assignments"]
-  STG_RT["stg_raw__ratings"]
-  STG_O["stg_raw__orders"]
-  STG_OI["stg_raw__order_items"]
-  STG_OSE["stg_raw__order_status_events"]
-  STG_R["stg_raw__refunds"]
-  STG_FX["stg_raw__fx_rates"]
-end
-
-S_C --> STG_C
-S_CA --> STG_CA
-S_RB --> STG_RB
-S_RO --> STG_RO
-S_MI --> STG_MI
-S_CO --> STG_CO
-S_CUR --> STG_CUR
-S_DA --> STG_DA
-S_RT --> STG_RT
-S_O --> STG_O
-S_OI --> STG_OI
-S_OSE --> STG_OSE
-S_R --> STG_R
-S_FX --> STG_FX
-
-%% =========================
-%% Intermediate
-%% =========================
-subgraph INT["dbt Intermediate (rollups + enrichments)"]
-  INT_ITEMS["int_orders__items_rollup"]
-  INT_STATUS["int_orders__status_rollup"]
-  INT_DELIV["int_orders__delivery_enriched"]
-  INT_RECON["int_orders__reconciliation"]
-  INT_ORD["int_orders__enriched"]
-
-  INT_OI_ENR["int_order_items__enriched"]
-  INT_REF_ENR["int_refunds__enriched"]
-
-  INT_MI_SNAP_SRC["int_menu_items__snapshot_source"]
-  INT_R_SNAP_SRC["int_restaurants__snapshot_source"]
-end
-
-STG_OI --> INT_ITEMS
-STG_OSE --> INT_STATUS
-STG_DA --> INT_DELIV
-STG_O --> INT_RECON
-
-STG_O --> INT_ORD
-INT_ITEMS --> INT_ORD
-INT_STATUS --> INT_ORD
-INT_DELIV --> INT_ORD
-INT_RECON --> INT_ORD
-
-STG_OI --> INT_OI_ENR
-STG_O --> INT_OI_ENR
-STG_MI --> INT_OI_ENR
-
-STG_R --> INT_REF_ENR
-INT_ORD --> INT_REF_ENR
-
-STG_MI --> INT_MI_SNAP_SRC
-STG_RO --> INT_R_SNAP_SRC
-STG_RB --> INT_R_SNAP_SRC
-
-%% =========================
-%% Snapshots (SCD2)
-%% =========================
-subgraph SNAP["dbt Snapshots (SCD2)"]
-  SNAP_MI["snap_menu_items<br/>(SCD2 snapshot)"]
-  SNAP_R["snap_restaurants<br/>(SCD2 snapshot)"]
-end
-
-INT_MI_SNAP_SRC --> SNAP_MI
-INT_R_SNAP_SRC --> SNAP_R
-
-%% =========================
-%% Gold Dimensions
-%% =========================
-subgraph DIMS["Gold Dims"]
-  DIM_C["dim_customers"]
-  DIM_CA["dim_customer_addresses"]
-  DIM_CO["dim_couriers"]
-  DIM_CUR["dim_currencies"]
-  DIM_DATE["dim_date"]
-
-  DIM_MI["dim_menu_items<br/>(from snapshot)"]
-  DIM_MI_BF["dim_menu_items_backfill<br/>(valid_from backfill)"]
-
-  DIM_R["dim_restaurants<br/>(from snapshot)"]
-  DIM_R_BF["dim_restaurants_backfill<br/>(valid_from backfill)"]
-end
-
-STG_C --> DIM_C
-STG_CA --> DIM_CA
-STG_CO --> DIM_CO
-STG_CUR --> DIM_CUR
-STG_O --> DIM_DATE
-STG_OSE --> DIM_DATE
-STG_R --> DIM_DATE
-STG_FX --> DIM_DATE
-
-SNAP_MI --> DIM_MI
-DIM_MI --> DIM_MI_BF
-
-SNAP_R --> DIM_R
-DIM_R --> DIM_R_BF
-
-%% =========================
-%% Gold Facts
-%% =========================
-subgraph FACTS["Gold Facts"]
-  F_FX["fct_fx_rates"]
-  F_O["fct_orders"]
-  F_OI["fct_order_items"]
-  F_R["fct_refunds"]
-end
-
-STG_FX --> F_FX
-DIM_CUR --> F_FX
-
-INT_ORD --> F_O
-DIM_R_BF --> F_O
-
-INT_OI_ENR --> F_OI
-DIM_MI_BF --> F_OI
-
-INT_REF_ENR --> F_R
-F_O --> F_R
-INT_ITEMS --> F_R
 ```
 
+---
+
+## OLTP ER diagram
+
 ```mermaid
-flowchart TB
+erDiagram
+  CUSTOMERS ||--o{ CUSTOMER_ADDRESSES : has
+  CUSTOMERS ||--o{ ORDERS : places
+  CUSTOMER_ADDRESSES ||--o{ ORDERS : used_for_delivery
 
-%% =========================
-%% Gold-only Star Schema
-%% =========================
-subgraph DIMS["Dimensions"]
-  DIM_C["dim_customers"]
-  DIM_CA["dim_customer_addresses"]
-  DIM_R["dim_restaurants<br/>(SCD2)"]
-  DIM_MI["dim_menu_items<br/>(SCD2)"]
-  DIM_CO["dim_couriers"]
-  DIM_CUR["dim_currencies"]
-  DIM_DATE["dim_date"]
-end
+  RESTAURANT_BRANDS ||--o{ RESTAURANT_OUTLETS : owns
+  RESTAURANT_OUTLETS ||--o{ MENU_ITEMS : offers
 
-subgraph FACTS["Facts"]
-  F_O["fct_orders"]
-  F_OI["fct_order_items"]
-  F_R["fct_refunds"]
-  F_FX["fct_fx_rates"]
-end
+  COURIERS ||--o{ DELIVERY_ASSIGNMENTS : assigned_to
+  ORDERS ||--|| DELIVERY_ASSIGNMENTS : has_assignment
 
-%% Orders grain = 1 row per order_id
-DIM_C --> F_O
-DIM_CA --> F_O
-DIM_R --> F_O
-DIM_CUR --> F_O
-DIM_DATE --> F_O
-DIM_CO --> F_O
+  CURRENCIES ||--o{ ORDERS : priced_in
+  CURRENCIES ||--o{ REFUNDS : refunded_in
+  CURRENCIES ||--o{ FX_RATES : base_or_quote
 
-%% Order Items grain = 1 row per order_item_id
-F_O --> F_OI
-DIM_MI --> F_OI
-DIM_DATE --> F_OI
-DIM_CUR --> F_OI
+  ORDERS ||--o{ ORDER_ITEMS : contains
+  MENU_ITEMS ||--o{ ORDER_ITEMS : referenced_by
 
-%% Refunds grain = 1 row per refund_id
-F_O --> F_R
-DIM_R --> F_R
-DIM_DATE --> F_R
-DIM_CUR --> F_R
+  ORDERS ||--o{ ORDER_STATUS_EVENTS : has_status_history
+  ORDERS ||--o{ REFUNDS : has_refunds
+  ORDERS ||--|| RATINGS : has_rating
 
-%% FX rates grain = 1 row per (base_currency_id, quote_currency_id, rate_ts)
-DIM_CUR --> F_FX
-DIM_DATE --> F_FX
+  CUSTOMERS {
+    BIGINT customer_id PK
+    TEXT full_name
+    TEXT email
+    TEXT phone
+    TIMESTAMPTZ created_at
+  }
+
+  CUSTOMER_ADDRESSES {
+    BIGINT address_id PK
+    BIGINT customer_id FK
+    TEXT label
+    TEXT line_1
+    TEXT line_2
+    TEXT city
+    TEXT state
+    TEXT country
+    TEXT postal_code
+    DECIMAL latitude
+    DECIMAL longitude
+    BOOLEAN is_default
+    TIMESTAMPTZ created_at
+  }
+
+  RESTAURANT_BRANDS {
+    BIGINT brand_id PK
+    TEXT brand_name
+    BOOLEAN is_active
+    TIMESTAMPTZ created_at
+  }
+
+  RESTAURANT_OUTLETS {
+    BIGINT restaurant_id PK
+    BIGINT brand_id FK
+    TEXT outlet_name
+    TEXT city
+    TEXT delivery_zone
+    TEXT address_line1
+    TEXT postal_code
+    BOOLEAN is_active
+    TIMESTAMPTZ created_at
+  }
+
+  MENU_ITEMS {
+    BIGINT menu_item_id PK
+    BIGINT restaurant_id FK
+    TEXT item_name
+    TEXT category
+    DECIMAL price
+    BOOLEAN is_available
+    TIMESTAMPTZ created_at
+  }
+
+  COURIERS {
+    BIGINT courier_id PK
+    TEXT city
+    TEXT vehicle
+    BOOLEAN is_active
+    TIMESTAMPTZ created_at
+  }
+
+  CURRENCIES {
+    BIGINT currency_id PK
+    CHAR currency_code
+    TEXT currency_name
+    BOOLEAN is_active
+    TIMESTAMPTZ created_at
+  }
+
+  FX_RATES {
+    BIGINT fx_rate_id PK
+    BIGINT base_currency_id FK
+    BIGINT quote_currency_id FK
+    TIMESTAMPTZ rate_ts
+    DECIMAL rate
+    TEXT source
+  }
+
+  ORDERS {
+    BIGINT order_id PK
+    BIGINT customer_id FK
+    BIGINT delivery_address_id FK
+    BIGINT restaurant_id FK
+    BIGINT currency_id FK
+    TIMESTAMPTZ order_placed_at
+    TIMESTAMPTZ scheduled_delivery
+    DECIMAL subtotal
+    DECIMAL tax
+    DECIMAL delivery_fee
+    DECIMAL discount
+    DECIMAL total_amount
+    TEXT payment_method
+    TEXT payment_status
+  }
+
+  ORDER_ITEMS {
+    BIGINT order_item_id PK
+    BIGINT order_id FK
+    BIGINT menu_item_id FK
+    INT quantity
+    DECIMAL unit_price
+    DECIMAL line_total
+  }
+
+  ORDER_STATUS_EVENTS {
+    BIGINT event_id PK
+    BIGINT order_id FK
+    TIMESTAMPTZ event_ts
+    TEXT status
+    TEXT actor
+    TEXT notes
+  }
+
+  DELIVERY_ASSIGNMENTS {
+    BIGINT order_id PK,FK
+    BIGINT courier_id FK
+    TIMESTAMPTZ assigned_at
+    TIMESTAMPTZ pickup_eta
+    TIMESTAMPTZ dropoff_eta
+  }
+
+  REFUNDS {
+    BIGINT refund_id PK
+    BIGINT order_id FK
+    BIGINT currency_id FK
+    TIMESTAMPTZ refund_ts
+    TEXT refund_reason
+    DECIMAL refund_amount
+  }
+
+  RATINGS {
+    BIGINT rating_id PK
+    BIGINT order_id FK
+    BIGINT customer_id FK
+    INT restaurant_rating
+    INT courier_rating
+    TEXT comment
+    TIMESTAMPTZ created_at
+  }
 ```
 
+---
 
+## Pipeline flow
 
+```mermaid
+flowchart LR
+  %% Sources / ingestion
+  PG[(PostgreSQL OLTP)] --> PY[postgres_to_duckdb.py]
+  PY --> PQ[(Parquet bronze\nfood_delivery_dbt/data/bronze)]
+  PQ --> SQLV[create_raw_views.sql]
+  SQLV --> RAW[(DuckDB schema: raw\nviews over parquet)]
 
+  %% dbt layers
+  RAW --> STG[Staging models\nstg_raw__*]
 
+  %% Staging -> intermediate (orders)
+  STG --> INT_ITEMS[int_order_items__enriched]
+  STG --> INT_ITEMS_ROLL[int_orders__items_rollup]
+  STG --> INT_STATUS[int_orders__status_rollup]
+  STG --> INT_DELIVERY[int_orders__delivery_enriched]
+  STG --> INT_RECON[int_orders__reconciliation]
+  INT_ITEMS_ROLL --> INT_ORDERS[int_orders__enriched]
+  INT_STATUS --> INT_ORDERS
+  INT_DELIVERY --> INT_ORDERS
+  INT_RECON --> INT_ORDERS
+  STG --> INT_ORDERS
 
+  %% Intermediate (refunds)
+  STG --> INT_REFUNDS[int_refunds__enriched]
+  INT_ORDERS --> INT_REFUNDS
 
+  %% Snapshot sources -> snapshots -> dims
+  STG --> SNAP_SRC_MI[int_menu_items__snapshot_source]
+  STG --> SNAP_SRC_R[int_restaurants__snapshot_source]
+  SNAP_SRC_MI --> SNAP_MI[snap_menu_items\n(SCD2 snapshot)]
+  SNAP_SRC_R --> SNAP_R[snap_restaurants\n(SCD2 snapshot)]
+  SNAP_MI --> DIM_MI[dim_menu_items\n(menu_item_sk SCD2)]
+  SNAP_R --> DIM_R[dim_restaurants\n(restaurant_sk SCD2)]
 
+  %% Backfill dims (anchor first record to 1900-01-01)
+  DIM_MI --> DIM_MI_BF[dim_menu_items_backfill]
+  DIM_R --> DIM_R_BF[dim_restaurants_backfill]
 
+  %% Other dims (type-1 style)
+  STG --> DIM_CUST[dim_customers]
+  STG --> DIM_ADDR[dim_customer_addresses]
+  STG --> DIM_CURR[dim_currencies]
+  STG --> DIM_COUR[dim_couriers]
+  STG --> DIM_DATE[dim_date]
 
+  %% Facts
+  STG --> FCT_FX[fct_fx_rates]
+  DIM_CURR --> FCT_FX
 
+  INT_ITEMS --> FCT_OI[fct_order_items]
+  DIM_MI_BF --> FCT_OI
 
+  INT_ORDERS --> FCT_O[fct_orders]
+  DIM_CUST --> FCT_O
+  DIM_ADDR --> FCT_O
+  DIM_CURR --> FCT_O
+  DIM_R_BF --> FCT_O
 
+  INT_REFUNDS --> FCT_REF[fct_refunds]
+  FCT_O --> FCT_REF
+  INT_ITEMS_ROLL --> FCT_REF
+```
 
+---
 
+## Gold star schema (only)
 
+```mermaid
+erDiagram
+  DIM_CUSTOMERS ||--o{ FCT_ORDERS : "customer_id"
+  DIM_CUSTOMER_ADDRESSES ||--o{ FCT_ORDERS : "address_id = delivery_address_id"
+  DIM_COURIERS ||--o{ FCT_ORDERS : "courier_id"
+  DIM_CURRENCIES ||--o{ FCT_ORDERS : "currency_id"
+  DIM_DATE ||--o{ FCT_ORDERS : "date_utc = order_date_utc"
 
+  DIM_RESTAURANTS ||--o{ FCT_ORDERS : "restaurant_sk"
+  DIM_RESTAURANTS ||--o{ FCT_REFUNDS : "restaurant_sk"
 
+  DIM_CUSTOMERS ||--o{ FCT_REFUNDS : "customer_id"
+  DIM_CURRENCIES ||--o{ FCT_REFUNDS : "currency_id"
+  DIM_DATE ||--o{ FCT_REFUNDS : "date_utc = refund_date_utc"
 
+  FCT_ORDERS ||--o{ FCT_ORDER_ITEMS : "order_id"
+  DIM_MENU_ITEMS ||--o{ FCT_ORDER_ITEMS : "menu_item_sk"
+  DIM_DATE ||--o{ FCT_ORDER_ITEMS : "date_utc = order_date_utc"
+  DIM_CURRENCIES ||--o{ FCT_ORDER_ITEMS : "currency_id"
+  DIM_CUSTOMERS ||--o{ FCT_ORDER_ITEMS : "customer_id"
 
+  DIM_CURRENCIES ||--o{ FCT_FX_RATES : "base_currency_id"
+  DIM_CURRENCIES ||--o{ FCT_FX_RATES : "quote_currency_id"
+  DIM_DATE ||--o{ FCT_FX_RATES : "date_utc = rate_date_utc"
+```
