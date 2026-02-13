@@ -490,51 +490,46 @@ erDiagram
 
 ```mermaid
 flowchart LR
-  %% Sources / ingestion
   PG[(PostgreSQL OLTP)] --> PY[postgres_to_duckdb.py]
-  PY --> PQ[(Parquet bronze\nfood_delivery_dbt/data/bronze)]
+  PY --> PQ[(Parquet bronze<br/>food_delivery_dbt/data/bronze)]
   PQ --> SQLV[create_raw_views.sql]
-  SQLV --> RAW[(DuckDB schema: raw\nviews over parquet)]
+  SQLV --> RAW[(DuckDB schema: raw<br/>views over Parquet)]
 
-  %% dbt layers
-  RAW --> STG[Staging models\nstg_raw__*]
+  RAW --> STG[Staging models<br/>stg_raw__*]
 
-  %% Staging -> intermediate (orders)
   STG --> INT_ITEMS[int_order_items__enriched]
   STG --> INT_ITEMS_ROLL[int_orders__items_rollup]
   STG --> INT_STATUS[int_orders__status_rollup]
   STG --> INT_DELIVERY[int_orders__delivery_enriched]
   STG --> INT_RECON[int_orders__reconciliation]
+
   INT_ITEMS_ROLL --> INT_ORDERS[int_orders__enriched]
   INT_STATUS --> INT_ORDERS
   INT_DELIVERY --> INT_ORDERS
   INT_RECON --> INT_ORDERS
   STG --> INT_ORDERS
 
-  %% Intermediate (refunds)
   STG --> INT_REFUNDS[int_refunds__enriched]
   INT_ORDERS --> INT_REFUNDS
 
-  %% Snapshot sources -> snapshots -> dims
   STG --> SNAP_SRC_MI[int_menu_items__snapshot_source]
   STG --> SNAP_SRC_R[int_restaurants__snapshot_source]
-  SNAP_SRC_MI --> SNAP_MI[snap_menu_items\n(SCD2 snapshot)]
-  SNAP_SRC_R --> SNAP_R[snap_restaurants\n(SCD2 snapshot)]
-  SNAP_MI --> DIM_MI[dim_menu_items\n(menu_item_sk SCD2)]
-  SNAP_R --> DIM_R[dim_restaurants\n(restaurant_sk SCD2)]
 
-  %% Backfill dims (anchor first record to 1900-01-01)
+  SNAP_SRC_MI --> SNAP_MI[snap_menu_items<br/>SCD2 snapshot]
+  SNAP_SRC_R --> SNAP_R[snap_restaurants<br/>SCD2 snapshot]
+
+  SNAP_MI --> DIM_MI[dim_menu_items<br/>menu_item_sk (SCD2)]
+  SNAP_R --> DIM_R[dim_restaurants<br/>restaurant_sk (SCD2)]
+
   DIM_MI --> DIM_MI_BF[dim_menu_items_backfill]
   DIM_R --> DIM_R_BF[dim_restaurants_backfill]
 
-  %% Other dims (type-1 style)
   STG --> DIM_CUST[dim_customers]
   STG --> DIM_ADDR[dim_customer_addresses]
   STG --> DIM_CURR[dim_currencies]
   STG --> DIM_COUR[dim_couriers]
   STG --> DIM_DATE[dim_date]
 
-  %% Facts
   STG --> FCT_FX[fct_fx_rates]
   DIM_CURR --> FCT_FX
 
