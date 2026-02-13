@@ -1,0 +1,48 @@
+version: 2
+models:
+- name: int_order_items__enriched
+  columns:
+  - name: order_item_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order line item.
+  - name: order_id
+    tests:
+    - not_null
+    - relationships:
+        to: ref('stg_raw__orders')
+        field: order_id
+    description: Unique identifier for the order.
+  - name: menu_item_id
+    tests:
+    - not_null
+    - relationships:
+        to: ref('stg_raw__menu_items')
+        field: menu_item_id
+    description: Unique identifier for the menu item.
+  - name: customer_id
+    description: Unique identifier for the customer.
+  - name: delivery_address_id
+    description: Identifier of the delivery address used for the order.
+  - name: restaurant_id
+    description: Unique identifier for the restaurant outlet.
+  - name: currency_id
+    description: Unique identifier for the currency.
+  - name: order_placed_at
+    description: Event timestamp (stored as timestamptz).
+  - name: order_date_utc
+    description: UTC date derived from the corresponding timestamp.
+  - name: quantity
+    tests:
+    - not_null
+    description: Quantity/count metric.
+  - name: unit_price
+    description: Monetary amount (decimal) in the specified currency.
+  - name: line_total
+    tests:
+    - not_null
+    description: Monetary amount (decimal) in the specified currency.
+  - name: is_menu_item_from_order_restaurant
+    description: True when the menu item belongs to the same restaurant as the order header (sanity check).
+  description: Intermediate model enriching order items with order header context and menu item attributes.

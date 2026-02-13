@@ -1,0 +1,56 @@
+version: 2
+models:
+- name: int_refunds__enriched
+  columns:
+  - name: refund_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the refund event.
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    - relationships:
+        to: ref('int_orders__enriched')
+        field: order_id
+    description: Unique identifier for the order.
+  - name: customer_id
+    description: Unique identifier for the customer.
+  - name: restaurant_id
+    description: Unique identifier for the restaurant outlet.
+  - name: courier_id
+    description: Unique identifier for the courier.
+  - name: refund_ts
+    tests:
+    - not_null
+    description: Event timestamp (stored as timestamptz).
+  - name: refund_reason
+    tests:
+    - not_null
+    description: Categorized reason for issuing the refund.
+  - name: refund_amount
+    tests:
+    - not_null
+    description: Monetary amount (decimal) in the specified currency.
+  - name: currency_id
+    description: Unique identifier for the currency.
+  - name: order_placed_at
+    description: Event timestamp (stored as timestamptz).
+  - name: order_date_utc
+    description: UTC date derived from the corresponding timestamp.
+  - name: latest_status
+    description: Order lifecycle status.
+  - name: delivered_at
+    description: Event timestamp (stored as timestamptz).
+  - name: canceled_at
+    description: Event timestamp (stored as timestamptz).
+  - name: total_amount
+    description: Monetary amount (decimal) in the specified currency.
+  - name: items_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: expected_total_minus_total_amount
+    description: Reconciliation metric derived from order lines and order header.
+  - name: is_refund_not_exceed_total
+    description: True when the refund amount is less than or equal to the order total amount.
+  description: Intermediate model enriching refunds with order-level context and refund sanity checks.

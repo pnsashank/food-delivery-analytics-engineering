@@ -1,0 +1,6 @@
+venv/
+target/
+dbt_packages/
+logs/
+**/.DS_Store
+**/*.duckdb

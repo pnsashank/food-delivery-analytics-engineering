@@ -1,0 +1,201 @@
+version: 2
+models:
+- name: int_orders__items_rollup
+  columns:
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order.
+  - name: items_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: items_total_qty
+    description: Quantity/count metric.
+  - name: item_lines
+    description: Quantity/count metric.
+  - name: distinct_menu_items
+    description: Quantity/count metric.
+  description: Intermediate model aggregating order line items to the order grain (subtotals and counts).
+- name: int_orders__status_rollup
+  columns:
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order.
+  - name: placed_at
+    description: Event timestamp (stored as timestamptz).
+  - name: accepted_at
+    description: Event timestamp (stored as timestamptz).
+  - name: prep_start_at
+    description: Event timestamp (stored as timestamptz).
+  - name: ready_for_pickup_at
+    description: Event timestamp (stored as timestamptz).
+  - name: picked_up_at
+    description: Event timestamp (stored as timestamptz).
+  - name: delivered_at
+    description: Event timestamp (stored as timestamptz).
+  - name: canceled_at
+    description: Event timestamp (stored as timestamptz).
+  - name: latest_status
+    tests:
+    - not_null
+    - accepted_values:
+        values:
+        - PLACED
+        - ACCEPTED
+        - PREP_START
+        - READY_FOR_PICKUP
+        - PICKED_UP
+        - DELIVERED
+        - CANCELED
+    description: Order lifecycle status.
+  - name: latest_status_at
+    description: Event timestamp (stored as timestamptz).
+  - name: is_delivered
+    description: Boolean indicator flag.
+  - name: is_canceled
+    description: Boolean indicator flag.
+  - name: minutes_to_accept
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_to_pickup
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_to_deliver
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_pickup_to_deliver
+    description: Elapsed time in minutes between order lifecycle milestones.
+  description: Intermediate model rolling up order lifecycle events to the order grain (milestones and durations).
+- name: int_orders__delivery_enriched
+  columns:
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order.
+  - name: courier_id
+    tests:
+    - not_null
+    description: Unique identifier for the courier.
+  - name: assigned_at
+    description: Delivery assignment timestamp or ETA.
+  - name: pickup_eta
+    description: Delivery assignment timestamp or ETA.
+  - name: dropoff_eta
+    description: Delivery assignment timestamp or ETA.
+  description: Intermediate model providing delivery assignment context at the order grain.
+- name: int_orders__reconciliation
+  columns:
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order.
+  - name: orders_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: items_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: subtotal_minus_items
+    description: Reconciliation metric derived from order lines and order header.
+  - name: tax
+    description: Monetary amount (decimal) in the specified currency.
+  - name: delivery_fee
+    description: Monetary amount (decimal) in the specified currency.
+  - name: discount
+    description: Monetary amount (decimal) in the specified currency.
+  - name: total_amount
+    description: Monetary amount (decimal) in the specified currency.
+  - name: expected_total_from_items
+    description: Reconciliation metric derived from order lines and order header.
+  - name: expected_total_minus_total_amount
+    description: Reconciliation metric derived from order lines and order header.
+  description: Intermediate reconciliation model comparing order header amounts vs item rollups and computing expected totals.
+- name: int_orders__enriched
+  columns:
+  - name: order_id
+    tests:
+    - not_null
+    - unique
+    description: Unique identifier for the order.
+  - name: customer_id
+    description: Unique identifier for the customer.
+  - name: delivery_address_id
+    description: Identifier of the delivery address used for the order.
+  - name: restaurant_id
+    description: Unique identifier for the restaurant outlet.
+  - name: currency_id
+    description: Unique identifier for the currency.
+  - name: order_placed_at
+    description: Event timestamp (stored as timestamptz).
+  - name: scheduled_delivery_at
+    description: Requested/scheduled delivery timestamp.
+  - name: order_date_utc
+    description: UTC date derived from the corresponding timestamp.
+  - name: subtotal
+    description: Monetary amount (decimal) in the specified currency.
+  - name: tax
+    description: Monetary amount (decimal) in the specified currency.
+  - name: delivery_fee
+    description: Monetary amount (decimal) in the specified currency.
+  - name: discount
+    description: Monetary amount (decimal) in the specified currency.
+  - name: total_amount
+    description: Monetary amount (decimal) in the specified currency.
+  - name: payment_method
+    description: Payment method used for the order.
+  - name: payment_status
+    description: Payment status of the order.
+  - name: items_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: items_total_qty
+    description: Quantity/count metric.
+  - name: item_lines
+    description: Quantity/count metric.
+  - name: distinct_menu_items
+    description: Quantity/count metric.
+  - name: placed_at
+    description: Event timestamp (stored as timestamptz).
+  - name: accepted_at
+    description: Event timestamp (stored as timestamptz).
+  - name: prep_start_at
+    description: Event timestamp (stored as timestamptz).
+  - name: ready_for_pickup_at
+    description: Event timestamp (stored as timestamptz).
+  - name: picked_up_at
+    description: Event timestamp (stored as timestamptz).
+  - name: delivered_at
+    description: Event timestamp (stored as timestamptz).
+  - name: canceled_at
+    description: Event timestamp (stored as timestamptz).
+  - name: latest_status
+    description: Order lifecycle status.
+  - name: latest_status_at
+    description: Event timestamp (stored as timestamptz).
+  - name: is_delivered
+    description: Boolean indicator flag.
+  - name: is_canceled
+    description: Boolean indicator flag.
+  - name: minutes_to_accept
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_to_pickup
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_to_deliver
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: minutes_pickup_to_deliver
+    description: Elapsed time in minutes between order lifecycle milestones.
+  - name: courier_id
+    description: Unique identifier for the courier.
+  - name: assigned_at
+    description: Delivery assignment timestamp or ETA.
+  - name: pickup_eta
+    description: Delivery assignment timestamp or ETA.
+  - name: dropoff_eta
+    description: Delivery assignment timestamp or ETA.
+  - name: orders_subtotal
+    description: Reconciliation metric derived from order lines and order header.
+  - name: subtotal_minus_items
+    description: Reconciliation metric derived from order lines and order header.
+  - name: expected_total_from_items
+    description: Reconciliation metric derived from order lines and order header.
+  - name: expected_total_minus_total_amount
+    description: Reconciliation metric derived from order lines and order header.
+  description: Intermediate order fact grain that joins header, item rollups, status rollups, delivery data, and reconciliation outputs.

@@ -1,0 +1,529 @@
+version: 2
+sources:
+- name: raw
+  schema: raw
+  tables:
+  - name: customers
+    columns:
+    - name: customer_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the customer.
+    - name: full_name
+      tests:
+      - not_null
+      description: Customer full name.
+    - name: email
+      tests:
+      - not_null
+      - unique
+      description: Customer email address.
+    - name: phone
+      description: Customer phone number.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Customer master data captured from the source system.
+  - name: customer_addresses
+    columns:
+    - name: address_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the customer address.
+    - name: customer_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'customers')
+          field: customer_id
+      description: Unique identifier for the customer.
+    - name: label
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - HOME
+          - WORK
+          - OTHER
+      description: Descriptive attribute.
+    - name: line_1
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: line_2
+      description: Location/address attribute.
+    - name: city
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: state
+      description: Location/address attribute.
+    - name: country
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: postal_code
+      description: Location/address attribute.
+    - name: latitude
+      description: Geographic coordinate.
+    - name: longitude
+      description: Geographic coordinate.
+    - name: is_default
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Customer delivery addresses captured from the source system.
+  - name: restaurant_brands
+    columns:
+    - name: brand_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the restaurant brand.
+    - name: brand_name
+      tests:
+      - not_null
+      - unique
+      description: Descriptive attribute.
+    - name: is_active
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Restaurant brand master data captured from the source system.
+  - name: restaurant_outlets
+    columns:
+    - name: restaurant_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the restaurant outlet.
+    - name: brand_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'restaurant_brands')
+          field: brand_id
+      description: Unique identifier for the restaurant brand.
+    - name: outlet_name
+      tests:
+      - not_null
+      description: Descriptive attribute.
+    - name: city
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: delivery_zone
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: address_line1
+      description: Location/address attribute.
+    - name: postal_code
+      description: Location/address attribute.
+    - name: is_active
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Restaurant outlet master data captured from the source system.
+  - name: menu_items
+    columns:
+    - name: menu_item_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the menu item.
+    - name: restaurant_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'restaurant_outlets')
+          field: restaurant_id
+      description: Unique identifier for the restaurant outlet.
+    - name: item_name
+      tests:
+      - not_null
+      description: Descriptive attribute.
+    - name: category
+      tests:
+      - not_null
+      description: Descriptive attribute.
+    - name: price
+      tests:
+      - not_null
+      description: Menu item list price (decimal) in the restaurant's configured currency.
+    - name: is_available
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Menu items offered by restaurants captured from the source system.
+  - name: couriers
+    columns:
+    - name: courier_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the courier.
+    - name: city
+      tests:
+      - not_null
+      description: Location/address attribute.
+    - name: vehicle
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - BIKE
+          - SCOOTER
+          - CAR
+      description: Courier vehicle type.
+    - name: is_active
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Courier master data captured from the source system.
+  - name: currencies
+    columns:
+    - name: currency_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the currency.
+    - name: currency_code
+      tests:
+      - not_null
+      - unique
+      description: ISO 4217 three-letter currency code.
+    - name: currency_name
+      tests:
+      - not_null
+      description: Human-readable currency name.
+    - name: is_active
+      tests:
+      - not_null
+      description: Boolean indicator flag.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Currency reference data captured from the source system.
+  - name: fx_rates
+    columns:
+    - name: fx_rate_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the FX rate observation.
+    - name: base_currency_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'currencies')
+          field: currency_id
+      description: Currency identifier for the base currency in the FX pair.
+    - name: quote_currency_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'currencies')
+          field: currency_id
+      description: Currency identifier for the quote currency in the FX pair.
+    - name: rate_ts
+      tests:
+      - not_null
+      description: Timestamp at which the FX rate applies.
+    - name: rate
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: source
+      description: Descriptive attribute.
+    - name: rate_day
+      description: Partitioning date written during extraction (UTC date).
+    description: Foreign exchange rates captured from the source system.
+  - name: orders
+    columns:
+    - name: order_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the order.
+    - name: customer_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'customers')
+          field: customer_id
+      description: Unique identifier for the customer.
+    - name: delivery_address_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'customer_addresses')
+          field: address_id
+      description: Identifier of the delivery address used for the order.
+    - name: restaurant_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'restaurant_outlets')
+          field: restaurant_id
+      description: Unique identifier for the restaurant outlet.
+    - name: currency_id
+      tests:
+      - relationships:
+          to: source('raw', 'currencies')
+          field: currency_id
+      description: Unique identifier for the currency.
+    - name: order_placed_at
+      tests:
+      - not_null
+      description: Event timestamp (stored as timestamptz).
+    - name: scheduled_delivery
+      description: Requested/scheduled delivery timestamp.
+    - name: subtotal
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: tax
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: delivery_fee
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: discount
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: total_amount
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: payment_method
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - CARD
+          - DIGITAL_WALLET
+          - CONTACTLESS_NFC
+          - CASH
+          - PAYPAL
+          - BANK_TRANSFER
+      description: Payment method used for the order.
+    - name: payment_status
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - PENDING
+          - AUTHORIZED
+          - PAID
+          - FAILED
+          - REFUNDED
+      description: Payment status of the order.
+    - name: order_day
+      description: Partitioning date written during extraction (UTC date).
+    description: Order header records captured from the source system.
+  - name: order_items
+    columns:
+    - name: order_item_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the order line item.
+    - name: order_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'orders')
+          field: order_id
+      description: Unique identifier for the order.
+    - name: menu_item_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'menu_items')
+          field: menu_item_id
+      description: Unique identifier for the menu item.
+    - name: quantity
+      tests:
+      - not_null
+      description: Quantity/count metric.
+    - name: unit_price
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: line_total
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: order_day
+      description: Partitioning date written during extraction (UTC date).
+    description: Order line items captured from the source system.
+  - name: order_status_events
+    columns:
+    - name: event_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the order status event.
+    - name: order_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'orders')
+          field: order_id
+      description: Unique identifier for the order.
+    - name: event_ts
+      tests:
+      - not_null
+      description: Event timestamp (stored as timestamptz).
+    - name: status
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - PLACED
+          - ACCEPTED
+          - PREP_START
+          - READY_FOR_PICKUP
+          - PICKED_UP
+          - DELIVERED
+          - CANCELED
+      description: Order lifecycle status.
+    - name: actor
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - SYSTEM
+          - RESTAURANT
+          - COURIER
+          - CUSTOMER
+      description: Actor responsible for the status change.
+    - name: event_day
+      description: Partitioning date written during extraction (UTC date).
+    description: Order status change events captured from the source system.
+  - name: delivery_assignments
+    columns:
+    - name: order_id
+      tests:
+      - not_null
+      - unique
+      - relationships:
+          to: source('raw', 'orders')
+          field: order_id
+      description: Unique identifier for the order.
+    - name: courier_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'couriers')
+          field: courier_id
+      description: Unique identifier for the courier.
+    - name: assigned_at
+      tests:
+      - not_null
+      description: Delivery assignment timestamp or ETA.
+    description: Courier assignments for orders captured from the source system.
+  - name: refunds
+    columns:
+    - name: refund_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the refund event.
+    - name: order_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'orders')
+          field: order_id
+      description: Unique identifier for the order.
+    - name: refund_ts
+      tests:
+      - not_null
+      description: Event timestamp (stored as timestamptz).
+    - name: refund_reason
+      tests:
+      - not_null
+      - accepted_values:
+          values:
+          - LATE_DELIVERY
+          - MISSING_ITEM
+          - WRONG_ITEM
+          - QUALITY_ISSUE
+          - OTHER
+      description: Categorized reason for issuing the refund.
+    - name: refund_amount
+      tests:
+      - not_null
+      description: Monetary amount (decimal) in the specified currency.
+    - name: currency_id
+      tests:
+      - relationships:
+          to: source('raw', 'currencies')
+          field: currency_id
+      description: Unique identifier for the currency.
+    - name: refund_day
+      description: Partitioning date written during extraction (UTC date).
+    description: Refund events captured from the source system.
+  - name: ratings
+    columns:
+    - name: rating_id
+      tests:
+      - not_null
+      - unique
+      description: Unique identifier for the rating event.
+    - name: order_id
+      tests:
+      - not_null
+      - unique
+      - relationships:
+          to: source('raw', 'orders')
+          field: order_id
+      description: Unique identifier for the order.
+    - name: customer_id
+      tests:
+      - not_null
+      - relationships:
+          to: source('raw', 'customers')
+          field: customer_id
+      description: Unique identifier for the customer.
+    - name: restaurant_rating
+      tests:
+      - not_null
+      description: Field from the upstream model/source.
+    - name: comment
+      description: Free-text comment/notes from the source.
+    - name: created_at
+      tests:
+      - not_null
+      description: Record creation timestamp in the source system.
+    description: Customer ratings for completed orders captured from the source system.
+  description: Raw schema exposed as views over bronze Parquet files. Treated as immutable inputs to staging models.
