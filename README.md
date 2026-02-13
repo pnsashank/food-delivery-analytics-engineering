@@ -518,8 +518,8 @@ flowchart LR
   SNAP_SRC_MI --> SNAP_MI[snap_menu_items SCD2 snapshot]
   SNAP_SRC_R --> SNAP_R[snap_restaurants SCD2 snapshot]
 
-  SNAP_MI --> DIM_MI[dim_menu_items (menu_item_sk SCD2)]
-  SNAP_R --> DIM_R[dim_restaurants (restaurant_sk SCD2)]
+  SNAP_MI --> DIM_MI[dim_menu_items - menu_item_sk SCD2]
+  SNAP_R --> DIM_R[dim_restaurants - restaurant_sk SCD2]
 
   DIM_MI --> DIM_MI_BF[dim_menu_items_backfill]
   DIM_R --> DIM_R_BF[dim_restaurants_backfill]
