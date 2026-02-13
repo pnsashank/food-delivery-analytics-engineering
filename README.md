@@ -491,11 +491,11 @@ erDiagram
 ```mermaid
 flowchart LR
   PG[(PostgreSQL OLTP)] --> PY[postgres_to_duckdb.py]
-  PY --> PQ[(Parquet bronze<br/>food_delivery_dbt/data/bronze)]
+  PY --> PQ[(Parquet bronze: food_delivery_dbt/data/bronze)]
   PQ --> SQLV[create_raw_views.sql]
-  SQLV --> RAW[(DuckDB schema: raw<br/>views over Parquet)]
+  SQLV --> RAW[(DuckDB schema raw: views over Parquet)]
 
-  RAW --> STG[Staging models<br/>stg_raw__*]
+  RAW --> STG[Staging models: stg_raw__*]
 
   STG --> INT_ITEMS[int_order_items__enriched]
   STG --> INT_ITEMS_ROLL[int_orders__items_rollup]
@@ -515,11 +515,11 @@ flowchart LR
   STG --> SNAP_SRC_MI[int_menu_items__snapshot_source]
   STG --> SNAP_SRC_R[int_restaurants__snapshot_source]
 
-  SNAP_SRC_MI --> SNAP_MI[snap_menu_items<br/>SCD2 snapshot]
-  SNAP_SRC_R --> SNAP_R[snap_restaurants<br/>SCD2 snapshot]
+  SNAP_SRC_MI --> SNAP_MI[snap_menu_items SCD2 snapshot]
+  SNAP_SRC_R --> SNAP_R[snap_restaurants SCD2 snapshot]
 
-  SNAP_MI --> DIM_MI[dim_menu_items<br/>menu_item_sk (SCD2)]
-  SNAP_R --> DIM_R[dim_restaurants<br/>restaurant_sk (SCD2)]
+  SNAP_MI --> DIM_MI[dim_menu_items (menu_item_sk SCD2)]
+  SNAP_R --> DIM_R[dim_restaurants (restaurant_sk SCD2)]
 
   DIM_MI --> DIM_MI_BF[dim_menu_items_backfill]
   DIM_R --> DIM_R_BF[dim_restaurants_backfill]
